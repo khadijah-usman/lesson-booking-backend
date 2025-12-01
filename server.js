@@ -3,6 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
+const path = require('path');
 const { MongoClient, ObjectId } = require('mongodb');
 
 const app = express();
@@ -27,17 +28,22 @@ app.use(cors());            // allow frontend to call API
 app.use(express.json());    // parse JSON bodies
 app.use(morgan('dev'));     // log requests
 
-// ====== TEST ROUTE ======
+// Serve static images (for middleware requirement / future use)
+app.use('/images', express.static(path.join(__dirname, 'images')));
+
+// ====== TEST & HEALTH ROUTES ======
 app.get('/', (req, res) => {
   res.json({ message: 'CST3144 Lessons API is running 🎓' });
 });
-// Simple health check route for debugging
+
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
-    uptime: process.uptime()
+    uptime: process.uptime(),
+    dbConnected: !!db
   });
 });
+
 // ====== GET /lessons ======
 app.get('/lessons', async (req, res) => {
   try {
@@ -49,33 +55,42 @@ app.get('/lessons', async (req, res) => {
   }
 });
 
+// ====== GET /orders (debug / demo) ======
+app.get('/orders', async (req, res) => {
+  try {
+    const orders = await ordersCollection.find({}).toArray();
+    res.json(orders);
+  } catch (error) {
+    console.error('Error fetching orders:', error);
+    res.status(500).json({ error: 'Failed to fetch orders' });
+  }
+});
+
 // ====== POST /orders ======
+// IMPORTANT: keep behaviour the same as your old working version
 app.post('/orders', async (req, res) => {
   try {
-    const { name, phone, email, lessons } = req.body;
+    const order = req.body;
 
-    if (!name || !phone || !email || !Array.isArray(lessons) || lessons.length === 0) {
-      return res.status(400).json({ error: 'Missing required order fields' });
+    // Very simple validation (same idea as before)
+    if (!order.name || !order.phone || !Array.isArray(order.lessons)) {
+      return res.status(400).json({ error: 'Invalid order data' });
     }
 
-    const orderDoc = {
-      name: String(name),
-      phone: String(phone),
-      email: String(email),
-      lessons: lessons.map(l => ({
-        lessonId: new ObjectId(l.lessonId),
-        quantity: Number(l.quantity) || 0
-      })),
-      createdAt: new Date()
-    };
+    // Add a timestamp but otherwise leave the structure alone
+    order.createdAt = new Date();
 
-    const result = await ordersCollection.insertOne(orderDoc);
-    res.status(201).json({ message: 'Order created', orderId: result.insertedId });
+    const result = await ordersCollection.insertOne(order);
+    res.status(201).json({
+      message: 'Order created',
+      orderId: result.insertedId
+    });
   } catch (error) {
     console.error('Error creating order:', error);
     res.status(500).json({ error: 'Failed to create order' });
   }
 });
+
 // ====== PUT /lessons/:id (update spaces or other fields) ======
 app.put('/lessons/:id', async (req, res) => {
   try {
