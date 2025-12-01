@@ -1,4 +1,6 @@
 // server.js
+// CST3144 Lesson Booking Backend (Node + Express + MongoDB)
+
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -17,25 +19,28 @@ let db;
 let lessonsCollection;
 let ordersCollection;
 
-// ====== BASIC CHECKS ======
+// Basic check for MongoDB connection string
 if (!MONGODB_URI) {
-  console.error('❌ MONGODB_URI is missing from .env');
+  console.error('MONGODB_URI is missing from .env');
   process.exit(1);
 }
 
 // ====== MIDDLEWARE ======
-app.use(cors());            // allow frontend to call API
-app.use(express.json());    // parse JSON bodies
-app.use(morgan('dev'));     // log requests
+app.use(cors());
+app.use(express.json());
+app.use(morgan('dev'));
 
-// Serve static images (for middleware requirement / future use)
+// Serve static files from /images if needed
 app.use('/images', express.static(path.join(__dirname, 'images')));
 
-// ====== TEST & HEALTH ROUTES ======
+// ====== BASIC / HEALTH ROUTES ======
+
+// Simple test route
 app.get('/', (req, res) => {
-  res.json({ message: 'CST3144 Lessons API is running 🎓' });
+  res.json({ message: 'CST3144 Lessons API is running' });
 });
 
+// Health check route
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
@@ -44,7 +49,9 @@ app.get('/health', (req, res) => {
   });
 });
 
-// ====== GET /lessons ======
+// ====== LESSON ROUTES ======
+
+// Return all lessons
 app.get('/lessons', async (req, res) => {
   try {
     const lessons = await lessonsCollection.find({}).toArray();
@@ -55,47 +62,11 @@ app.get('/lessons', async (req, res) => {
   }
 });
 
-// ====== GET /orders (debug / demo) ======
-app.get('/orders', async (req, res) => {
-  try {
-    const orders = await ordersCollection.find({}).toArray();
-    res.json(orders);
-  } catch (error) {
-    console.error('Error fetching orders:', error);
-    res.status(500).json({ error: 'Failed to fetch orders' });
-  }
-});
-
-// ====== POST /orders ======
-// IMPORTANT: keep behaviour the same as your old working version
-app.post('/orders', async (req, res) => {
-  try {
-    const order = req.body;
-
-    // Very simple validation (same idea as before)
-    if (!order.name || !order.phone || !Array.isArray(order.lessons)) {
-      return res.status(400).json({ error: 'Invalid order data' });
-    }
-
-    // Add a timestamp but otherwise leave the structure alone
-    order.createdAt = new Date();
-
-    const result = await ordersCollection.insertOne(order);
-    res.status(201).json({
-      message: 'Order created',
-      orderId: result.insertedId
-    });
-  } catch (error) {
-    console.error('Error creating order:', error);
-    res.status(500).json({ error: 'Failed to create order' });
-  }
-});
-
-// ====== PUT /lessons/:id (update spaces or other fields) ======
+// Update a lesson (e.g. spaces)
 app.put('/lessons/:id', async (req, res) => {
   try {
     const lessonId = req.params.id;
-    const updateData = req.body; // e.g. { spaces: 3 }
+    const updateData = req.body;
 
     const result = await lessonsCollection.updateOne(
       { _id: new ObjectId(lessonId) },
@@ -113,33 +84,68 @@ app.put('/lessons/:id', async (req, res) => {
   }
 });
 
-// ====== CONNECT TO MONGODB AND START SERVER ======
+// ====== ORDER ROUTES ======
+
+// View all orders (useful for debugging/demo)
+app.get('/orders', async (req, res) => {
+  try {
+    const orders = await ordersCollection.find({}).toArray();
+    res.json(orders);
+  } catch (error) {
+    console.error('Error fetching orders:', error);
+    res.status(500).json({ error: 'Failed to fetch orders' });
+  }
+});
+
+// Create a new order (called from Vue checkout)
+app.post('/orders', async (req, res) => {
+  try {
+    const order = req.body;
+
+    // Simple validation
+    if (!order.name || !order.phone || !Array.isArray(order.lessons)) {
+      return res.status(400).json({ error: 'Invalid order data' });
+    }
+
+    order.createdAt = new Date();
+
+    const result = await ordersCollection.insertOne(order);
+
+    res.status(201).json({
+      message: 'Order created',
+      orderId: result.insertedId
+    });
+  } catch (error) {
+    console.error('Error creating order:', error);
+    res.status(500).json({ error: 'Failed to create order' });
+  }
+});
+
+// ====== STARTUP (CONNECT + LISTEN) ======
+
 async function start() {
   try {
-    console.log('Starting server.js...');
-    console.log('MONGODB_URI:', MONGODB_URI ? 'present' : 'MISSING');
-    console.log('Connecting to MongoDB (10s timeout)...');
+    console.log('Starting server...');
+    console.log('Connecting to MongoDB...');
 
     const client = await MongoClient.connect(MONGODB_URI, {
-      serverSelectionTimeoutMS: 10000 // 10 seconds then throw error
+      serverSelectionTimeoutMS: 10000
     });
 
-    console.log('✅ MongoClient.connect resolved');
     db = client.db(DB_NAME);
-    console.log('✅ Connected to MongoDB Atlas, DB:', DB_NAME);
+    console.log('Connected to MongoDB database:', DB_NAME);
 
     lessonsCollection = db.collection('lessons');
     ordersCollection = db.collection('orders');
 
     app.listen(PORT, () => {
-      console.log(`🚀 Server listening on http://localhost:${PORT}`);
+      console.log('Server listening on http://localhost:' + PORT);
     });
   } catch (error) {
-    console.error('❌ Failed to start server');
+    console.error('Failed to start server');
     console.error(error);
     process.exit(1);
   }
 }
 
-// IMPORTANT: actually start the server
 start();
