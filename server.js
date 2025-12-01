@@ -52,24 +52,30 @@ app.get('/lessons', async (req, res) => {
 // ====== POST /orders ======
 app.post('/orders', async (req, res) => {
   try {
-    const order = req.body;
+    const { name, phone, email, lessons } = req.body;
 
-    // Very simple validation
-    if (!order.name || !order.phone || !Array.isArray(order.lessons)) {
-      return res.status(400).json({ error: 'Invalid order data' });
+    if (!name || !phone || !email || !Array.isArray(lessons) || lessons.length === 0) {
+      return res.status(400).json({ error: 'Missing required order fields' });
     }
 
-    const result = await ordersCollection.insertOne(order);
-    res.status(201).json({
-      message: 'Order created',
-      orderId: result.insertedId
-    });
+    const orderDoc = {
+      name: String(name),
+      phone: String(phone),
+      email: String(email),
+      lessons: lessons.map(l => ({
+        lessonId: new ObjectId(l.lessonId),
+        quantity: Number(l.quantity) || 0
+      })),
+      createdAt: new Date()
+    };
+
+    const result = await ordersCollection.insertOne(orderDoc);
+    res.status(201).json({ message: 'Order created', orderId: result.insertedId });
   } catch (error) {
     console.error('Error creating order:', error);
     res.status(500).json({ error: 'Failed to create order' });
   }
 });
-
 // ====== PUT /lessons/:id (update spaces or other fields) ======
 app.put('/lessons/:id', async (req, res) => {
   try {
