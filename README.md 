@@ -1,0 +1,18 @@
+# Lesson Booking Backend (CST3144)
+
+## Requirements
+- Node.js
+- MongoDB Atlas
+
+## Setup
+1. Clone this repo.
+2. Run `npm install`.
+3. Create a `.env` file based on `.env.example`.
+4. Start the server with `npm start` or `node server.js`.
+
+The API exposes:
+- `GET /lessons` – list all lessons
+- `POST /orders` – create order
+- `PUT /lessons/:id` – update lesson (e.g. spaces)
+- `GET /orders` – list orders (debug)
+- `GET /health` – health check
