@@ -31,7 +31,13 @@ app.use(morgan('dev'));     // log requests
 app.get('/', (req, res) => {
   res.json({ message: 'CST3144 Lessons API is running 🎓' });
 });
-
+// Simple health check route for debugging
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    uptime: process.uptime()
+  });
+});
 // ====== GET /lessons ======
 app.get('/lessons', async (req, res) => {
   try {
