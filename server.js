@@ -10,11 +10,16 @@ const { MongoClient, ObjectId } = require('mongodb');
 
 const app = express();
 
-// ====== CONFIG ======
+// ========= CONFIGURATION =========
+
+// Port for the HTTP server
 const PORT = process.env.PORT || 4000;
+
+// MongoDB connection details (stored in .env)
 const MONGODB_URI = process.env.MONGODB_URI;
 const DB_NAME = process.env.MONGODB_DB_NAME || 'lesson-booking';
 
+// These are set after connecting to MongoDB
 let db;
 let lessonsCollection;
 let ordersCollection;
@@ -25,22 +30,28 @@ if (!MONGODB_URI) {
   process.exit(1);
 }
 
-// ====== MIDDLEWARE ======
+// ========= GLOBAL MIDDLEWARE =========
+
+// Allow the Vue front end (different origin/port) to call this API
 app.use(cors());
+
+// Parse incoming JSON request bodies
 app.use(express.json());
+
+// Log requests to the console
 app.use(morgan('dev'));
 
 // Serve static files from /images if needed
 app.use('/images', express.static(path.join(__dirname, 'images')));
 
-// ====== BASIC / HEALTH ROUTES ======
+// ========= BASIC / HEALTH ROUTES =========
 
-// Simple test route
+// Simple test route to confirm the API is running
 app.get('/', (req, res) => {
   res.json({ message: 'CST3144 Lessons API is running' });
 });
 
-// Health check route
+// Health check route for debugging and deployment checks
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
@@ -49,9 +60,10 @@ app.get('/health', (req, res) => {
   });
 });
 
-// ====== LESSON ROUTES ======
+// ========= LESSON ROUTES =========
 
-// Return all lessons
+// GET /lessons
+// Returns all lessons from the "lessons" collection
 app.get('/lessons', async (req, res) => {
   try {
     const lessons = await lessonsCollection.find({}).toArray();
@@ -62,7 +74,8 @@ app.get('/lessons', async (req, res) => {
   }
 });
 
-// Update a lesson (e.g. spaces)
+// PUT /lessons/:id
+// Updates a lesson document (used to save remaining spaces after checkout)
 app.put('/lessons/:id', async (req, res) => {
   try {
     const lessonId = req.params.id;
@@ -84,9 +97,10 @@ app.put('/lessons/:id', async (req, res) => {
   }
 });
 
-// ====== ORDER ROUTES ======
+// ========= ORDER ROUTES =========
 
-// View all orders (useful for debugging/demo)
+// GET /orders
+// Returns all orders (mainly for debugging and demonstration)
 app.get('/orders', async (req, res) => {
   try {
     const orders = await ordersCollection.find({}).toArray();
@@ -97,16 +111,18 @@ app.get('/orders', async (req, res) => {
   }
 });
 
-// Create a new order (called from Vue checkout)
+// POST /orders
+// Receives order details from the Vue checkout form and stores them in MongoDB
 app.post('/orders', async (req, res) => {
   try {
     const order = req.body;
 
-    // Simple validation
+    // Basic validation to ensure the payload is sensible
     if (!order.name || !order.phone || !Array.isArray(order.lessons)) {
       return res.status(400).json({ error: 'Invalid order data' });
     }
 
+    // Record when the order was created
     order.createdAt = new Date();
 
     const result = await ordersCollection.insertOne(order);
@@ -121,8 +137,9 @@ app.post('/orders', async (req, res) => {
   }
 });
 
-// ====== STARTUP (CONNECT + LISTEN) ======
+// ========= STARTUP (CONNECT + LISTEN) =========
 
+// Connect to MongoDB Atlas and start the Express server
 async function start() {
   try {
     console.log('Starting server...');
@@ -135,6 +152,7 @@ async function start() {
     db = client.db(DB_NAME);
     console.log('Connected to MongoDB database:', DB_NAME);
 
+    // Set up collection references once the connection is ready
     lessonsCollection = db.collection('lessons');
     ordersCollection = db.collection('orders');
 
